@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Galaxia 3D · Corazones y partículas</title>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #0a0a1a; }
+    #info {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: rgba(255, 200, 220, 0.5);
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      pointer-events: none;
+      text-shadow: 0 0 10px #ff3b6f;
+      letter-spacing: 2px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">✦ corazones flotantes · partículas de amor ✦</div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.126.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.126.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- Escena, cámara, renderizador ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a1a);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(12, 6, 18);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // --- Controles ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.8;
+    controls.target.set(0, 0, 0);
+    controls.update();
+
+    // --- Luces ---
+    const ambient = new THREE.AmbientLight(0x404060);
+    scene.add(ambient);
+
+    const light = new THREE.DirectionalLight(0xffaacc, 1.2);
+    light.position.set(5, 10, 7);
+    scene.add(light);
+
+    const fillLight = new THREE.PointLight(0xff66aa, 0.8);
+    fillLight.position.set(-5, 2, 5);
+    scene.add(fillLight);
+
+    const blueLight = new THREE.PointLight(0x4466ff, 0.5);
+    blueLight.position.set(0, -3, 8);
+    scene.add(blueLight);
+
+    // --- Corazón pixelado central (Minecraft) ---
+    function createPixelHeart() {
+      const group = new THREE.Group();
+      const heartPattern = [
+        [0,1,1,0,1,1,0],
+        [1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1],
+        [0,1,1,1,1,1,0],
+        [0,0,1,1,1,0,0],
+        [0,0,0,1,0,0,0]
+      ];
+      const pixelSize = 0.55;
+      const colorPink = new THREE.Color(0xff3b6f);
+      
+      for (let row = 0; row < heartPattern.length; row++) {
+        for (let col = 0; col < heartPattern[row].length; col++) {
+          if (heartPattern[row][col] === 1) {
+            const mat = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(0xff3b6f).offsetHSL(0, 0, Math.random() * 0.2 - 0.1),
+              roughness: 0.4,
+              metalness: 0.1,
+              emissive: new THREE.Color(0x550022),
+              emissiveIntensity: 0.3
+            });
+            const cube = new THREE.Mesh(new THREE.BoxGeometry(pixelSize, pixelSize, pixelSize), mat);
+            cube.position.set((col - 3) * pixelSize, (3 - row) * pixelSize, 0);
+            group.add(cube);
+          }
+        }
+      }
+      // Capas traseras
+      const layers = [-0.55, 0.55];
+      layers.forEach((zOffset) => {
+        for (let row = 0; row < heartPattern.length; row++) {
+          for (let col = 0; col < heartPattern[row].length; col++) {
+            if (heartPattern[row][col] === 1) {
+              const smallMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(0xff4d7a),
+                roughness: 0.6,
+                emissive: new THREE.Color(0x330011),
+                emissiveIntensity: 0.2
+              });
+              const cube = new THREE.Mesh(new THREE.BoxGeometry(pixelSize*0.9, pixelSize*0.9, pixelSize*0.5), smallMat);
+              cube.position.set((col - 3) * pixelSize, (3 - row) * pixelSize, zOffset);
+              group.add(cube);
+            }
+          }
+        }
+      });
+      return group;
+    }
+
+    const heartGroup = createPixelHeart();
+    heartGroup.position.set(0, 0, 0);
+    heartGroup.rotation.x = -0.1;
+    heartGroup.rotation.y = 0.3;
+    scene.add(heartGroup);
+
+    // --- CORAZONES FLOTANTES (más pequeños) ---
+    function createFloatingHearts(count = 50) {
+      const group = new THREE.Group();
+      const smallHeart = [
+        [0,1,1,1,0],
+        [1,1,1,1,1],
+        [1,1,1,1,1],
+        [0,1,1,1,0],
+        [0,0,1,0,0]
+      ];
+      const pixelSize = 0.18; // más pequeños
+      
+      for (let i = 0; i < count; i++) {
+        const heart = new THREE.Group();
+        for (let row = 0; row < smallHeart.length; row++) {
+          for (let col = 0; col < smallHeart[row].length; col++) {
+            if (smallHeart[row][col] === 1) {
+              const mat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(0xff3b6f).offsetHSL(0, 0, Math.random() * 0.2 - 0.1),
+                roughness: 0.5,
+                emissive: new THREE.Color(0x550022),
+                emissiveIntensity: 0.2
+              });
+              const cube = new THREE.Mesh(new THREE.BoxGeometry(pixelSize, pixelSize, pixelSize), mat);
+              cube.position.set((col - 2) * pixelSize, (2 - row) * pixelSize, 0);
+              heart.add(cube);
+            }
+          }
+        }
+        // Posición en esfera
+        const radius = 3.5 + Math.random() * 5.5;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        heart.position.set(
+          radius * Math.sin(phi) * Math.cos(theta),
+          radius * Math.sin(phi) * Math.sin(theta) * 0.6,
+          radius * Math.cos(phi)
+        );
+        heart.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        const scale = 0.5 + Math.random() * 0.6;
+        heart.scale.set(scale, scale, scale);
+        
+        heart.userData = {
+          speed: 0.002 + Math.random() * 0.005,
+          angle: Math.random() * Math.PI * 2,
+          radius: radius,
+          phi: phi,
+          theta: theta,
+          floatSpeed: 0.01 + Math.random() * 0.02,
+          floatOffset: Math.random() * 100
+        };
+        group.add(heart);
+      }
+      return group;
+    }
+
+    const floatingHearts = createFloatingHearts(60);
+    scene.add(floatingHearts);
+
+    // --- PARTÍCULAS DE CORAZONES ROJOS (sistema de partículas con sprite) ---
+    function createHeartParticles() {
+      const count = 400;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      
+      // Crear un sprite de corazón en canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 32, 32);
+      
+      // Dibujar corazón rojo
+      ctx.fillStyle = '#ff1a4a';
+      ctx.shadowColor = '#ff1a4a';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(16, 28);
+      ctx.bezierCurveTo(16, 28, 4, 20, 4, 12);
+      ctx.bezierCurveTo(4, 6, 10, 4, 16, 10);
+      ctx.bezierCurveTo(22, 4, 28, 6, 28, 12);
+      ctx.bezierCurveTo(28, 20, 16, 28, 16, 28);
+      ctx.fill();
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      
+      const material = new THREE.PointsMaterial({
+        map: texture,
+        size: 0.35,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        color: 0xff3b6f,
+        opacity: 0.9
+      });
+
+      const geometry = new THREE.BufferGeometry();
+      
+      for (let i = 0; i < count; i++) {
+        // Distribución en esfera con radio entre 2 y 9
+        const r = 2 + Math.random() * 7;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta) * 0.7;
+        positions[i*3+2] = r * Math.cos(phi);
+        
+        // Color variado entre rojo y rosa
+        const color = new THREE.Color(0xff1a4a).lerp(new THREE.Color(0xff6b8a), Math.random());
+        colors[i*3] = color.r;
+        colors[i*3+1] = color.g;
+        colors[i*3+2] = color.b;
+      }
+      
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      
+      const points = new THREE.Points(geometry, material);
+      points.userData = {
+        velocities: new Float32Array(count * 3)
+      };
+      // Velocidades aleatorias para animación
+      for (let i = 0; i < count; i++) {
+        points.userData.velocities[i*3] = (Math.random() - 0.5) * 0.008;
+        points.userData.velocities[i*3+1] = (Math.random() - 0.5) * 0.008;
+        points.userData.velocities[i*3+2] = (Math.random() - 0.5) * 0.008;
+      }
+      return points;
+    }
+
+    const heartParticles = createHeartParticles();
+    scene.add(heartParticles);
+
+    // --- Mensajes orbitales ---
+    function createOrbitalMessages() {
+      const group = new THREE.Group();
+      const messages = [
+        "Te quiero mucho❤️", "Eres muy linda", "Me encantas",
+        "Eres única", "💕 Eres mi sol 💕", "Te adoro enserio;3",
+        "Eres muy hermosa", "Mi corazóncito sjsj ❤️", "Siempre pienso en ti",
+        "Eres especial sjsjsj"
+      ];
+
+      messages.forEach((text, index) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.shadowColor = '#ff3b6f';
+        ctx.shadowBlur = 20;
+        ctx.font = 'Bold 48px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        gradient.addColorStop(0, '#ff6b8a');
+        gradient.addColorStop(0.5, '#ff3b6f');
+        gradient.addColorStop(1, '#ff6b8a');
+        ctx.fillStyle = gradient;
+        ctx.shadowBlur = 30;
+        ctx.fillText(text, canvas.width/2, canvas.height/2);
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = 0.3;
+        ctx.fillText(text, canvas.width/2, canvas.height/2 - 2);
+        ctx.globalAlpha = 1.0;
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+        const sprite = new THREE.Sprite(material);
+        const angle = (index / messages.length) * Math.PI * 2;
+        const radiusX = 7.5;
+        const radiusZ = 5.5;
+        sprite.position.set(
+          Math.cos(angle) * radiusX,
+          Math.sin(angle * 2) * 1.2 + 0.5,
+          Math.sin(angle) * radiusZ
+        );
+        const scale = 1.2 + Math.sin(angle * 3) * 0.3;
+        sprite.scale.set(scale * 1.8, scale * 0.6, 1);
+        sprite.userData = {
+          angle: angle,
+          radiusX: radiusX,
+          radiusZ: radiusZ,
+          speed: 0.002 + Math.random() * 0.001,
+        };
+        group.add(sprite);
+      });
+      return group;
+    }
+
+    const orbitalMessages = createOrbitalMessages();
+    scene.add(orbitalMessages);
+
+    // --- Estrellas de fondo ---
+    function createStars() {
+      const vertices = [];
+      for (let i = 0; i < 2000; i++) {
+        const r = 30 + Math.random() * 50;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        vertices.push(
+          r * Math.sin(phi) * Math.cos(theta),
+          r * Math.sin(phi) * Math.sin(theta),
+          r * Math.cos(phi)
+        );
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      const material = new THREE.PointsMaterial({
+        color: 0x99aaff,
+        size: 0.25,
+        transparent: true,
+        blending: THREE.AdditiveBlending
+      });
+      scene.add(new THREE.Points(geometry, material));
+    }
+    createStars();
+
+    // --- Animación ---
+    let clock = new THREE.Clock();
+
+    function animate() {
+      const delta = clock.getDelta();
+      const elapsedTime = performance.now() / 1000;
+
+      // Corazón central
+      heartGroup.rotation.y += 0.002;
+      heartGroup.rotation.x = Math.sin(elapsedTime * 0.1) * 0.1;
+      heartGroup.rotation.z = Math.sin(elapsedTime * 0.15) * 0.05;
+
+      // Corazones flotantes (más pequeños)
+      floatingHearts.children.forEach((heart) => {
+        const data = heart.userData;
+        if (data) {
+          data.angle += data.speed * 0.5;
+          const r = data.radius;
+          const theta = data.theta + data.angle * 0.1;
+          const phi = data.phi + data.angle * 0.05;
+          heart.position.set(
+            r * Math.sin(phi) * Math.cos(theta),
+            r * Math.sin(phi) * Math.sin(theta) * 0.6 + Math.sin(elapsedTime * data.floatSpeed + data.floatOffset) * 0.5,
+            r * Math.cos(phi)
+          );
+          heart.rotation.x += 0.01;
+          heart.rotation.y += 0.02;
+          heart.rotation.z += 0.005;
+        }
+      });
+
+      // Partículas de corazones rojos (movimiento suave)
+      const positions = heartParticles.geometry.attributes.position.array;
+      const velocities = heartParticles.userData.velocities;
+      for (let i = 0; i < positions.length / 3; i++) {
+        positions[i*3] += velocities[i*3];
+        positions[i*3+1] += velocities[i*3+1];
+        positions[i*3+2] += velocities[i*3+2];
+        // Rebote suave en los bordes (radio entre 2 y 9)
+        const x = positions[i*3], y = positions[i*3+1], z = positions[i*3+2];
+        const dist = Math.sqrt(x*x + y*y + z*z);
+        if (dist > 9) {
+          velocities[i*3] -= x * 0.001;
+          velocities[i*3+1] -= y * 0.001;
+          velocities[i*3+2] -= z * 0.001;
+        } else if (dist < 2) {
+          velocities[i*3] += x * 0.001;
+          velocities[i*3+1] += y * 0.001;
+          velocities[i*3+2] += z * 0.001;
+        }
+        // Limitar velocidad
+        const maxVel = 0.015;
+        const vx = velocities[i*3], vy = velocities[i*3+1], vz = velocities[i*3+2];
+        const v = Math.sqrt(vx*vx + vy*vy + vz*vz);
+        if (v > maxVel) {
+          velocities[i*3] = (vx / v) * maxVel;
+          velocities[i*3+1] = (vy / v) * maxVel;
+          velocities[i*3+2] = (vz / v) * maxVel;
+        }
+      }
+      heartParticles.geometry.attributes.position.needsUpdate = true;
+
+      // Mensajes orbitales
+      orbitalMessages.children.forEach((sprite) => {
+        const data = sprite.userData;
+        if (data) {
+          data.angle += data.speed;
+          sprite.position.set(
+            Math.cos(data.angle) * data.radiusX,
+            Math.sin(data.angle * 2) * 1.2 + 0.5,
+            Math.sin(data.angle) * data.radiusZ
+          );
+        }
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    // --- Resize ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
